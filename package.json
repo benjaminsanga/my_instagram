@@ -7,6 +7,7 @@
     "@apollo/client": "^3.8.6",
     "@aws-amplify/ui-react": "^5.3.1",
     "@emotion/core": "^11.0.0",
+    "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "antd": "^5.10.3",
     "antd-img-crop": "^4.13.0",
@@ -41,5 +42,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11"
   }
 }

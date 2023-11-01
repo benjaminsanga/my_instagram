@@ -1,0 +1,162 @@
+/** @jsx jsx */ /** @jsxRuntime classic */
+import React, {useContext, useEffect, useState} from 'react';
+import { Button, Form, Input, Upload } from 'antd';
+import { Storage } from 'aws-amplify';
+import Avatar from '../../components/Avatar/Avatar';
+import { css, jsx } from '@emotion/react';
+import { LoggedInUserContext } from '../../user-context';
+import { Navigate } from 'react-router-dom';
+import { gql, useMutation } from '@apollo/client';
+
+
+const customChangeProfilePicQuery = gql`
+  mutation ChangeProfilePic($input: UpdateUserInput!) {
+    updateUser(input: $input) {
+      id
+    }
+  }
+`;
+
+const updateUserDataQuery = gql`
+  mutation UpdateUser(
+    $input: UpdateUserInput!
+    $condition: ModelUserConditionInput
+  ) {
+    updateUser(input: $input, condition: $condition) {
+      id
+      username
+      name
+      bio
+      email
+      photoUrl
+    }
+  }
+`;
+
+
+function EditProfilePage() {
+  const { loggedInUserData, fetchLoggedInUserData, currentCredentials } = useContext(LoggedInUserContext);
+  const [changeProfilePic] = useMutation(customChangeProfilePicQuery);
+  const [updateUserData] = useMutation(updateUserDataQuery);
+  
+  useEffect(() => {
+    if (loggedInUserData.getUser.id === null) {
+      console.log('not found yet');
+    } else {
+      console.log('found');
+      changeInitialData({
+        name: loggedInUserData.getUser.name,
+        bio: loggedInUserData.getUser.bio
+      });
+      changeFormData({
+        name: loggedInUserData.getUser.name,
+        bio: loggedInUserData.getUser.bio
+      })
+      changeIsUserFound(true);
+    }
+  }, [loggedInUserData])
+  
+  const [isUserFound, changeIsUserFound] = useState(false);
+  const [initialData, changeInitialData] = useState({
+    name: '',
+    bio: ''
+  });
+  
+  const [formData, changeFormData] = useState({
+    name: loggedInUserData.getUser.name,
+    bio: loggedInUserData.getUser.bio
+  });
+  
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    console.log(formData);
+
+    let updateUserInput = {
+      id: loggedInUserData.getUser.id,
+      name: formData.name,
+      bio: formData.bio
+    };
+    console.log(updateUserInput)
+    updateUserData({variables: {input: updateUserInput}})
+    fetchLoggedInUserData();
+  }
+  
+  const handlePicUpload = file => {
+    console.log(file)
+    Storage.put(`${loggedInUserData.getUser.id}/${file.name}`, file, {
+      level: 'public',
+      contentType: file.type
+    })
+    .then (result => {
+      let imgKey = result.key;
+      let updateUserInput = {
+        id: loggedInUserData.getUser.id,
+        photoUrl: imgKey
+      };
+
+      changeProfilePic({variables: {input: updateUserInput}})
+      .then(res => {
+        fetchLoggedInUserData();
+      })
+      .catch(err => console.log(err))
+    })
+    .catch(err => console.log(err));
+  }
+  
+  return (
+    currentCredentials.authenticated
+    ? <div
+      css={css`
+        padding: 20px;
+      `}
+    >
+      {isUserFound
+      ? <div 
+          css={css`
+            background: white;
+            padding: 40px;
+            border: 1px solid lightgrey;
+            border-radius: 4px;
+            height: 600px;
+          `}
+        >
+          <h1>Edit Profile</h1>
+          <div css={{display: 'flex', alignContent: 'center', alignItems: 'center'}}>
+            <Avatar img={loggedInUserData.getUser.photoUrl} css={{alignContent: 'center'}} username={loggedInUserData.getUser.username} />
+            <div css={{padding: '0 10px'}}>
+              <h2 css={{margin: 0, padding: 0}}>{loggedInUserData.getUser.username}</h2>
+              <Upload 
+                accept="image/*" 
+                showUploadList={false}
+                beforeUpload={handlePicUpload}
+              >
+                <Button css={{border: 0, color: 'dodgerblue', boxShadow: 'none', margin: 0, padding: 0, height: '22px'}}>
+                  <span css={{fontWeight: '700'}}>Change Profile Photo</span>
+                </Button>
+              </Upload>
+            </div>
+          </div>
+          <Form onSubmit={handleSubmit}>
+            <label htmlFor="name">Name</label>
+            <Input size="large" type="text" name="name" id="name" value={formData.name} onChange={e => changeFormData({...formData, name: e.target.value})}  />
+            <label htmlFor="bio">Bio</label>
+            <Input size="large" type="text" name="bio" id="bio" value={formData.bio} onChange={e => changeFormData({...formData, bio: e.target.value})} />
+            <Button
+              disabled={JSON.stringify(formData) === JSON.stringify(initialData) ? true : false}
+              type="primary"
+              onClick={handleSubmit}
+              css={{marginTop: '10px'}}
+            >
+              Submit
+            </Button>
+          </Form>
+        </div>
+      : null
+      }
+    </div>
+    : <Navigate to="/" />
+  )
+}
+
+export default EditProfilePage;
